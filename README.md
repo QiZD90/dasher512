@@ -18,6 +18,7 @@ Alternatively, you can run on *nix hosts:
     ./build.sh
 ### Running it on emulator
 You can use any of major emulators to run a game. Here's an example with `qemu`:
+
 	qemu-system-i386 build/build.bin
 Or if you are on *nix host and have `qemu` installed, you can run:
 
