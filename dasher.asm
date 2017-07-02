@@ -9,8 +9,8 @@ start:
 	mov ss, ax
 	
 	; Setup stack
-	mov sp, 0x0000
-	mov bp, 0x7C00
+	mov sp, 0x7f00
+	mov bp, 0x7e00
 
 	; Set up videomode (ah is 0x00 due to xor)
 	mov al, 0x03; 80x25 colored VGA text videomode
@@ -33,17 +33,17 @@ loop:
 
 	mov cx, [hero_pos]
 	cmp cx, [finish_pos]
-	jnz .endif
+	jnz short .endif
 	call draw
 	call end_level
 
 	.endif:
 	cmp [buffer], BYTE 0
-	jz loop
+	jz short loop
 
 	call input
 
-	jmp loop
+	jmp short loop
 
 load_level:
 	mov [delta_y], BYTE 0
@@ -69,12 +69,12 @@ draw:
 	mov ch, 0 ; Row counter
 	row_loop:
 		cmp ch, 8
-		jz row_end
+		jz short row_end
 		
 		mov cl, 0 ; Column counter
 		column_loop:
 			cmp cl, 8
-			jz column_end
+			jz short column_end
 
 			push cx
 			call get_block_info
@@ -82,27 +82,23 @@ draw:
 			call move_cursor
 
 			cmp [buffer], BYTE 0
-			jnz .wall
-			jz  .void
+			jnz short .wall
+			jz short  .void
 
 			.wall:
 				push WORD '#'
-				call draw_char
-				jmp endif
-
+				jmp short .endif
 			.void:
 				push WORD ' '
-				call draw_char
-				jmp endif
-
-			endif:
+			.endif:
+			call draw_char
 
 			inc cl
-			jmp column_loop
+			jmp short column_loop
 		
 		column_end:
 		inc ch
-		jmp row_loop
+		jmp short row_loop
 		
 
 	row_end:
@@ -178,11 +174,11 @@ update:
 	call get_block_info
 
 	cmp [buffer], BYTE 0
-	jnz .stop
+	jnz short .stop
 	
 	mov [hero_pos], cx
 	
-	jmp .out
+	jmp short .out
 	.stop:
 		mov [delta_y], BYTE 0
 		mov [delta_x], BYTE 0
@@ -205,40 +201,42 @@ sleep:
 		
 
 input:
+	.loop:
+	; Blocking keyboard input
 	mov ah, 0
 	int 0x16
 	
-	cmp ah, 0x11 ; 'W'
-	jz up_pressed
+	cmp ah, 0x48 ; Up arrow
+	jz short up_pressed
 	
-	cmp ah, 0x1e ; 'A'
-	jz left_pressed
+	cmp ah, 0x4b ; Left arrow
+	jz short left_pressed
 
-	cmp ah, 0x1f ; 'S'
-	jz down_pressed
+	cmp ah, 0x50 ; Down arrow
+	jz short down_pressed
 
-	cmp ah, 0x20 ; 'D'
-	jnz _endif
+	cmp ah, 0x4d ; Right arrow
+	jnz short .loop
 
 	right_pressed:
 		mov [delta_x], BYTE 1
 		mov [delta_y], BYTE 0
-		jmp _endif
+		jmp short _endif
 
 	up_pressed:
 		mov [delta_x], BYTE 0
 		mov [delta_y], BYTE -1
-		jmp _endif
+		jmp short _endif
 
 	left_pressed:
 		mov [delta_x], BYTE -1
 		mov [delta_y], BYTE 0
-		jmp _endif
+		jmp short _endif
 
 	down_pressed:
 		mov [delta_x], BYTE 0
 		mov [delta_y], BYTE 1
-		jmp _endif
+		jmp short _endif
 
 	_endif:
 	ret
@@ -248,11 +246,11 @@ end_level:
 	mov bl, [current_level]
 
 	cmp bl, [level_count]
-	jnz .endif
+	jnz short .endif
 
 	push WORD 0
 	call move_cursor
-	jmp win
+	jmp short win
 
 	.endif:
 	call load_level
@@ -266,7 +264,7 @@ win:
 	push WORD 16384
 	call sleep
 
-	jmp win
+	jmp short win
 
 ; Levels' layouts 8x8 (0 - void, 1 - wall), 2 bytes for start pos, 2 bytes for finish pos
 ; Can't mark the start/end of level layout with commentary, because NASM throws an error
@@ -290,24 +288,15 @@ level db 11111111b,\
          1, 1, 1, 4,\
          11111111b,\
          10000011b,\
-         11010001b,\
+         11011001b,\
          11000101b,\
          10000001b,\
          10101001b,\
          10001001b,\
          11111111b,\
          1, 1, 2, 2,\
-         11111111b,\
-         10010001b,\
-         10000101b,\
-         11011101b,\
-         10000101b,\
-         10010001b,\
-         11010001b,\
-         11111111b,\
-         2, 6, 1, 5
 
-level_count db 4
+level_count db 3
 current_level db 0
 
 hero_pos dw 0x0101
