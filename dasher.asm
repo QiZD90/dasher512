@@ -1,6 +1,9 @@
 org   0x7c00
 bits  16
 
+sizeof_level equ 36 ; size of level in bytes
+levels_count equ (levels_end-levels)/sizeof_level
+
 start:
 	; Setup registers and segments
 	xor ax, ax
@@ -51,12 +54,12 @@ load_level:
 
 	mov  bx, 0
 	mov  bl, [current_level]
-	imul bx, 12
+	imul bx, sizeof_level
 
-	mov ax, [level+bx+8]
+	mov ax, [levels+bx+(sizeof_level-4)]
 	mov [hero_pos], ax
 
-	mov ax, [level+bx+10]
+	mov ax, [levels+bx+(sizeof_level-2)]
 	mov [finish_pos], ax
 
 	call draw
@@ -68,12 +71,12 @@ load_level:
 draw:
 	mov ch, 0 ; Row counter
 	.row_loop:
-		cmp ch, 8
+		cmp ch, 16
 		jz short .row_end
 
 		mov cl, 0 ; Column counter
 		.column_loop:
-			cmp cl, 8
+			cmp cl, 16
 			jz short .column_end
 
 			push cx
@@ -82,7 +85,6 @@ draw:
 			call move_cursor
 
 			cmp [buffer], BYTE 0
-			jnz short .wall
 			jz short  .void
 
 			.wall:
@@ -135,20 +137,40 @@ get_block_info:
 	pop cx
 	push bx
 
-	; Compute an offset from the start of the levels data
-	mov  bx, 0
-	mov  bl, [current_level]
-	imul bx, 12
-	add  bl, ch
+	push cx
 
-	; Get one row
-	mov dl, [level+bx]
+	; Compute an offset from the start of the levels data
+	mov bx, 0
+	mov bl, [current_level]
+	imul bx, sizeof_level ; now BX stores an offset from the start of a level
+	shl ch, 1 ; as every row occupies 2 bytes, we should multiply it
+
+	xor ax, ax ; clear AX
+	mov al, ch ; "byte to word"
+
+	add bx,ax
+
+	; Get one row, things are getting tricky here
+	cmp cl, 8
+	jnge short .endif ; if CL<8
+	.if_greater_or_equals:
+		inc bx
+	.endif:
+	mov dl, [levels+bx]
+
+	jnge short .endif_2 ; if CL<8
+	.if_greater_or_equals_2:
+		dec bx
+		sub cl, 8 ; CL = CL MOD 8
+	.endif_2:
 
 	mov bx, 1<<7
 	shr bx, cl
 
 	and dl, bl
 	mov [buffer], dl
+
+	pop cx
 
 	ret
 
@@ -245,7 +267,7 @@ end_level:
 	inc BYTE [current_level]
 	mov bl, [current_level]
 
-	cmp bl, [level_count]
+	cmp bl, levels_count
 	jnz short .endif
 
 	push WORD 0
@@ -267,41 +289,46 @@ win:
 	jmp short win
 
 ; Levels' layouts 8x8 (0 - void, 1 - wall), 2 bytes for start pos, 2 bytes for finish pos
-level:
-db 11111111b
-db 10000001b
-db 10000001b
-db 10000001b
-db 10000001b
-db 10000001b
-db 10000001b
-db 11111111b
+levels:
+db 11111111b, 11111111b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 11111111b, 11111111b
 db 1, 1
-db 6, 6
+db 14, 14
 
-db 11111111b
-db 10000001b
-db 11111101b
-db 11100001b
-db 10001001b
-db 10001001b
-db 10001001b
-db 11111111b
+db 11111111b, 11111111b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 10000000b, 00000001b
+db 11111111b, 11111111b
 db 1, 1
-db 1, 4
+db 14, 14
+levels_end:
 
-db 11111111b
-db 10000011b
-db 11011001b
-db 11000101b
-db 10000001b
-db 10101001b
-db 10001001b
-db 11111111b
-db 1, 1
-db 2, 2
-
-level_count db 3
 current_level db 0
 
 hero_pos dw 0
