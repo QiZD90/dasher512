@@ -4,11 +4,14 @@ bits  16
 sizeof_level equ 36 ; size of level in bytes
 levels_count equ (levels_end-levels)/sizeof_level
 
+green equ 2
+red equ 4
+yellow equ 14
+
 start:
 	; Setup registers and segments
 	xor ax, ax
 	mov ds, ax
-	mov es, ax
 	mov ss, ax
 
 	; Setup stack
@@ -37,9 +40,9 @@ loop:
 	mov cx, [hero_pos]
 	cmp cx, [finish_pos]
 	jnz short .endif
-	call draw
-	call end_level
-
+	.on_finish:
+		call draw
+		call end_level
 	.endif:
 	cmp [buffer], BYTE 0
 	jz short loop
@@ -88,7 +91,7 @@ draw:
 			jz short  .void
 
 			.wall:
-				push WORD '#'
+				push WORD (green<<8 | '#')
 				jmp short .endif
 			.void:
 				push WORD ' '
@@ -106,13 +109,13 @@ draw:
 	; Drawing finish
 	push WORD [finish_pos]
 	call move_cursor
-	push WORD '$'
+	push WORD (red<<8 | '$')
 	call draw_char
 
 	; Drawing hero
 	push WORD [hero_pos]
 	call move_cursor
-	push WORD '@'
+	push WORD (red<<8 | '@')
 	call draw_char
 
 	ret
@@ -176,14 +179,21 @@ get_block_info:
 
 ; Outputs a character at current cursor position
 ; Separate subprograms for all characters aren't given due to an overhead
-; input: 1 word - character (high byte is 0x00, and low byte is an ascii code)
+; input: 1 word - character (high byte is color, and low byte is an ascii code)
 draw_char:
 	pop bx
 	pop ax
 	push bx
 
-	mov ah, 0x0e
+	push cx
+
+	mov bl, ah
+	mov ah, 0x09
+	mov cx, 1
+	mov bh, 0
 	int 0x10
+
+	pop cx
 
 	ret
 
@@ -213,11 +223,16 @@ update:
 sleep:
 	pop bx
 	pop dx
-	pop cx
+	pop ax
 	push bx
+
+	push cx
+	mov cx, ax
 
 	mov ah, 0x86
 	int 0x15
+
+	pop cx
 
 	ret
 
@@ -279,14 +294,28 @@ end_level:
 	ret
 
 win:
-	push WORD '$'
-	call draw_char
+	xor cx, cx
+	.win_loop:
+		push cx
+		call move_cursor
+		push WORD (yellow<<8 | '$')
+		call draw_char
 
-	push WORD 0
-	push WORD 16384
-	call sleep
+		cmp cx, 0xffff
+		jnz short .endif
+		.end:
+			cli
+			hlt
+			jmp short .end
+		.endif:
 
-	jmp short win
+		push WORD 0
+		push WORD 16384
+		call sleep
+
+		inc cx
+
+		jmp short .win_loop
 
 ; Levels' layouts 8x8 (0 - void, 1 - wall), 2 bytes for start pos, 2 bytes for finish pos
 levels:
@@ -309,24 +338,24 @@ db 11111111b, 11111111b
 db 1, 1
 db 14, 14
 
-db 11111111b, 11111111b
-db 10110000b, 00000011b
-db 10100000b, 00000001b
-db 10100000b, 00000001b
-db 10100000b, 00000001b
-db 10100000b, 00000001b
-db 10100000b, 00000001b
-db 10100000b, 00000001b
-db 10100000b, 00000001b
-db 10100000b, 00000101b
-db 10111000b, 00000101b
-db 10000000b, 00000101b
-db 10100000b, 00000101b
-db 10110000b, 00111101b
-db 10000000b, 00000001b
-db 11111111b, 11111111b
-db 1, 1
-db 2, 11
+;db 11111111b, 11111111b
+;db 10110000b, 00000011b
+;db 10100000b, 00000001b
+;db 10100000b, 00000001b
+;db 10100000b, 00000001b
+;db 10100000b, 00000001b
+;db 10100000b, 00000001b
+;db 10100000b, 00000001b
+;db 10100000b, 00000001b
+;db 10100000b, 00000101b
+;db 10111000b, 00000101b
+;db 10000000b, 00000101b
+;db 10100000b, 00000101b
+;db 10110000b, 00111101b
+;db 10000000b, 00000001b
+;db 11111111b, 11111111b
+;db 1, 1
+;db 2, 11
 levels_end:
 
 current_level db 0
