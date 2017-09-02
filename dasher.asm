@@ -7,10 +7,10 @@ start:
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
-	
+
 	; Setup stack
-	mov sp, 0x7f00
-	mov bp, 0x7e00
+	mov sp, 0x7c00
+	mov bp, sp
 
 	; Set up videomode (ah is 0x00 due to xor)
 	mov al, 0x03; 80x25 colored VGA text videomode
@@ -52,7 +52,7 @@ load_level:
 	mov  bx, 0
 	mov  bl, [current_level]
 	imul bx, 12
-	
+
 	mov ax, [level+bx+8]
 	mov [hero_pos], ax
 
@@ -61,20 +61,20 @@ load_level:
 
 	call draw
 	call input
-	call update	
+	call update
 
 	ret
 
 draw:
 	mov ch, 0 ; Row counter
-	row_loop:
+	.row_loop:
 		cmp ch, 8
-		jz short row_end
-		
+		jz short .row_end
+
 		mov cl, 0 ; Column counter
-		column_loop:
+		.column_loop:
 			cmp cl, 8
-			jz short column_end
+			jz short .column_end
 
 			push cx
 			call get_block_info
@@ -94,14 +94,12 @@ draw:
 			call draw_char
 
 			inc cl
-			jmp short column_loop
-		
-		column_end:
-		inc ch
-		jmp short row_loop
-		
+			jmp short .column_loop
 
-	row_end:
+		.column_end:
+		inc ch
+		jmp short .row_loop
+	.row_end:
 
 	; Drawing finish
 	push WORD [finish_pos]
@@ -127,7 +125,7 @@ move_cursor:
 	mov bx, 0
 	mov ah, 0x02
 	int 0x10
-	
+
 	ret
 
 ; Writes to the buffer 0, if tile on specified coordinates is void, and anything else otherwise
@@ -137,24 +135,26 @@ get_block_info:
 	pop cx
 	push bx
 
+	; Compute an offset from the start of the levels data
 	mov  bx, 0
 	mov  bl, [current_level]
 	imul bx, 12
 	add  bl, ch
 
-	mov dl, [level+bx] 
+	; Get one row
+	mov dl, [level+bx]
 
 	mov bx, 1<<7
 	shr bx, cl
-	
+
 	and dl, bl
 	mov [buffer], dl
-	
+
 	ret
 
 ; Outputs a character at current cursor position
 ; Separate subprograms for all characters aren't given due to an overhead
-; input: 1 word - character (high byte is 0x00, and low byte is a ascii code)
+; input: 1 word - character (high byte is 0x00, and low byte is an ascii code)
 draw_char:
 	pop bx
 	pop ax
@@ -174,20 +174,20 @@ update:
 	call get_block_info
 
 	cmp [buffer], BYTE 0
-	jnz short .stop
-	
-	mov [hero_pos], cx
-	
-	jmp short .out
-	.stop:
+	jz short .is_void
+	.is_block:
 		mov [delta_y], BYTE 0
 		mov [delta_x], BYTE 0
-	.out:
+
+		jmp .endif
+	.is_void:
+		mov [hero_pos], cx
+	.endif:
 
 	ret
 
 ; Sleeps for specified time
-; input: 2 words - amount of microseconds, 
+; input: 2 words - amount of microseconds,
 sleep:
 	pop bx
 	pop dx
@@ -198,51 +198,51 @@ sleep:
 	int 0x15
 
 	ret
-		
+
 
 input:
 	.loop:
 	; Blocking keyboard input
 	mov ah, 0
 	int 0x16
-	
+
 	cmp ah, 0x48 ; Up arrow
-	jz short up_pressed
-	
+	jz short .up_pressed
+
 	cmp ah, 0x4b ; Left arrow
-	jz short left_pressed
+	jz short .left_pressed
 
 	cmp ah, 0x50 ; Down arrow
-	jz short down_pressed
+	jz short .down_pressed
 
 	cmp ah, 0x4d ; Right arrow
 	jnz short .loop
 
-	right_pressed:
+	.right_pressed:
 		mov [delta_x], BYTE 1
 		mov [delta_y], BYTE 0
-		jmp short _endif
+		jmp short .endif
 
-	up_pressed:
+	.up_pressed:
 		mov [delta_x], BYTE 0
 		mov [delta_y], BYTE -1
-		jmp short _endif
+		jmp short .endif
 
-	left_pressed:
+	.left_pressed:
 		mov [delta_x], BYTE -1
 		mov [delta_y], BYTE 0
-		jmp short _endif
+		jmp short .endif
 
-	down_pressed:
+	.down_pressed:
 		mov [delta_x], BYTE 0
 		mov [delta_y], BYTE 1
-		jmp short _endif
+		jmp short .endif
 
-	_endif:
+	.endif:
 	ret
 
 end_level:
-	add [current_level], BYTE 1
+	inc BYTE [current_level]
 	mov bl, [current_level]
 
 	cmp bl, [level_count]
@@ -267,40 +267,45 @@ win:
 	jmp short win
 
 ; Levels' layouts 8x8 (0 - void, 1 - wall), 2 bytes for start pos, 2 bytes for finish pos
-; Can't mark the start/end of level layout with commentary, because NASM throws an error
-level db 11111111b,\
-         10000001b,\
-         10000001b,\
-         10000001b,\
-         10000001b,\
-         10000001b,\
-         10000001b,\
-         11111111b,\
-         1, 1, 6, 6,\
-         11111111b,\
-         10000001b,\
-         11111101b,\
-         11100001b,\
-         10001001b,\
-         10001001b,\
-         10001001b,\
-         11111111b,\
-         1, 1, 1, 4,\
-         11111111b,\
-         10000011b,\
-         11011001b,\
-         11000101b,\
-         10000001b,\
-         10101001b,\
-         10001001b,\
-         11111111b,\
-         1, 1, 2, 2,\
+level:
+db 11111111b
+db 10000001b
+db 10000001b
+db 10000001b
+db 10000001b
+db 10000001b
+db 10000001b
+db 11111111b
+db 1, 1
+db 6, 6
+
+db 11111111b
+db 10000001b
+db 11111101b
+db 11100001b
+db 10001001b
+db 10001001b
+db 10001001b
+db 11111111b
+db 1, 1
+db 1, 4
+
+db 11111111b
+db 10000011b
+db 11011001b
+db 11000101b
+db 10000001b
+db 10101001b
+db 10001001b
+db 11111111b
+db 1, 1
+db 2, 2
 
 level_count db 3
 current_level db 0
 
-hero_pos dw 0x0101
-finish_pos dw 0x0601
+hero_pos dw 0
+finish_pos dw 0
 
 ; Currrent velocity on x- and y-axes
 delta_x db 0
