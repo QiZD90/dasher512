@@ -7,7 +7,7 @@ Slide from wall to wall, trying to solve a puzzle and reach the finish. The game
 ## Controls
 **Arrow keys** - movement
 ### Levels
-There are only three levels in the game right now, but their count and quality will grow.
+There are only two levels in the game right now, but their count and quality will grow.
 ## Testing it out
 ### Building
 **NASM** assembler is necessary for build.
