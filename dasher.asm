@@ -67,8 +67,6 @@ load_level:
 
 	call draw
 	call input
-	;call update
-
 	ret
 
 draw:
@@ -109,7 +107,7 @@ draw:
 	; Drawing finish
 	push WORD [finish_pos]
 	call move_cursor
-	push WORD (red<<8 | '$')
+	push WORD (yellow<<8 | '$')
 	call draw_char
 
 	; Drawing hero
@@ -223,16 +221,11 @@ update:
 sleep:
 	pop bx
 	pop dx
-	pop ax
+	pop cx
 	push bx
-
-	push cx
-	mov cx, ax
 
 	mov ah, 0x86
 	int 0x15
-
-	pop cx
 
 	ret
 
@@ -294,50 +287,20 @@ end_level:
 	ret
 
 win:
-	xor cx, cx
+	xor si, si
 	.win_loop:
-		push cx
-		call move_cursor
-		push WORD (yellow<<8 | '$')
-		call draw_char
-
-		cmp cx, 0xffff
-		jnz short .endif
-		.end:
-			cli
-			hlt
-			jmp short .end
-		.endif:
+		mov ah, 0x0e
+		mov al, '$'
+		int 0x10
 
 		push WORD 0
 		push WORD 16384
 		call sleep
 
-		inc cx
-
 		jmp short .win_loop
 
 ; Levels' layouts 8x8 (0 - void, 1 - wall), 2 bytes for start pos, 2 bytes for finish pos
 levels:
-;db 11111111b, 11111111b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 10000000b, 00000001b
-;db 11111111b, 11111111b
-;db 1, 1
-;db 14, 14
-
 db 11111111b, 11111111b
 db 10110000b, 00000011b
 db 10100000b, 00000001b
@@ -356,6 +319,25 @@ db 10000000b, 00000001b
 db 11111111b, 11111111b
 db 1, 1
 db 2, 11
+
+db 11111111b, 11111111b
+db 10010000b, 00000001b
+db 10000001b, 00000101b
+db 11011111b, 11111101b
+db 11000000b, 01000001b
+db 10010111b, 01110001b
+db 10010100b, 00010001b
+db 10010101b, 01000011b
+db 10010101b, 00010001b
+db 10010101b, 11010001b
+db 10010100b, 00010001b
+db 10010111b, 11110001b
+db 10010000b, 00000001b
+db 10011110b, 10110001b
+db 10000010b, 00000001b
+db 11111111b, 11111111b
+db 8, 8
+db 14, 8
 levels_end:
 
 current_level db 0
